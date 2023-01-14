@@ -62,24 +62,38 @@ def test_posts(db: Session = Depends(get_db)):
     return{"posts":posts}
 
 @app.get("/posts")
-def get_posts():
-    cursor.execute("""SELECT   * FROM posts""")
-    posts =cursor.fetchall()
-    return {"data":posts}
+def get_posts(db: Session = Depends(get_db)):
+    # Direct from PostGres
+    # cursor.execute("""SELECT   * FROM posts""")
+    # posts =cursor.fetchall()
+    # return {"data":posts}
+    posts = db.query(models.Post).all()
+    return{"posts":posts}
+
+
 
 
 @app.post("/posts",status_code=status.HTTP_201_CREATED)
-def create_posts(post:Post):
+def create_post(post:Post,db: Session = Depends(get_db)):
     # post_dict =post.dict()
     # post_dict['id'] = randrange(0,1000000)
     # my_posts.append(post_dict)
     # return {"data":post_dict}
     #title str, content str
-    cursor.execute("""INSERT INTO posts (title,content,published) VALUES (%s,%s,%s) RETURNING *""",
-    (post.title,post.content,post.published))
-    new_post = cursor.fetchone()
-    conn.commit()
+    # cursor.execute("""INSERT INTO posts (title,content,published) VALUES (%s,%s,%s) RETURNING *""",
+    # (post.title,post.content,post.published))
+    # new_post = cursor.fetchone()
+    # conn.commit()
+    # return {"new post":new_post}
+
+    # inefficient way
+    new_post = models.Post(title = post.title,content = post.content,published = post.published)
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
     return {"new post":new_post}
+
+
 
    
 @app.get("/posts/{id}")
