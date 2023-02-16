@@ -87,7 +87,13 @@ def create_post(post:Post,db: Session = Depends(get_db)):
     # return {"new post":new_post}
 
     # inefficient way
-    new_post = models.Post(title = post.title,content = post.content,published = post.published)
+    # new_post = models.Post(title = post.title,content = post.content,published = post.published)
+    # db.add(new_post)
+    # db.commit()
+    # db.refresh(new_post)
+    # return {"new post":new_post}
+    # Efficient way
+    new_post = models.Post(**post.dict())
     db.add(new_post)
     db.commit()
     db.refresh(new_post)
@@ -97,32 +103,39 @@ def create_post(post:Post,db: Session = Depends(get_db)):
 
    
 @app.get("/posts/{id}")
-def get_post(id:int):
-    cursor.execute("""SELECT   * FROM posts WHERE id = %s""",(str(id)))
-    post =cursor.fetchone()
+def get_post(id:int,db: Session = Depends(get_db)):
+    # cursor.execute("""SELECT   * FROM posts WHERE id = %s""",(str(id)))
+    # post =cursor.fetchone()
 
+    
+    post = db.query(models.Post).filter(models.Post.id ==id).first()
+    print(post)
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Post doesnot found")
     return {"post_detail":post}
 
 @app.delete("/posts/{id}",status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(id:int):
+def delete_post(id:int,db: Session = Depends(get_db)):
     #deleting post
-    cursor.execute("""DELETE FROM posts WHERE id = %s RETURNING *""",(str(id)))
-    deleted_post = cursor.fetchone()
-    conn.commit()
-
-    if deleted_post ==None:
+    # cursor.execute("""DELETE FROM posts WHERE id = %s RETURNING *""",(str(id)))
+    # deleted_post = cursor.fetchone()
+    # conn.commit()
+    post=db.query(models.Post).filter(models.Post.id ==id)
+    if post.first() ==None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Post doesnot exist")
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    post.delete(synchronize_session=False)
+    db.commit()
 
+@app.put("/posts/{id}",)
+def update_post(id:int,updated_post:Post,db: Session = Depends(get_db)):
+    # cursor.execute("""UPDATE posts SET title = %s, content = %s, published = %s  WHERE id = %s RETURNING *""",(post.title,post.content,post.published,str(id)))
+    # updated_post = cursor.fetchone()
+    # conn.commit()
+    post_query = db.query(models.Post).filter(models.Post.id ==id)
+    post = post_query.first()
 
-@app.put("/posts/{id}")
-def update_post(id:int,post:Post):
-    cursor.execute("""UPDATE posts SET title = %s, content = %s, published = %s  WHERE id = %s RETURNING *""",(post.title,post.content,post.published,str(id)))
-    updated_post = cursor.fetchone()
-    conn.commit()
-    if updated_post ==None:
+    if post ==None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Post with id: {id} doesnot exist")
-    
-    return{"data":updated_post}
+    post_query.update(updated_post.dict(),synchronize_session=False)
+    db.commit()
+    return{"data":post_query.first()}
